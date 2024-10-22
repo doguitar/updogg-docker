@@ -1,0 +1,83 @@
+name: build
+
+on:
+  schedule:
+    - cron: '0 14 * * *' # Run at 6:00 AM PST
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get the latest HEAD commit date
+        id: head_commit
+        run: |
+          # Get the latest commit date
+          HEAD_COMMIT_DATE=$(git log -1 --format=%ct)
+          echo "HEAD_COMMIT_DATE=$HEAD_COMMIT_DATE" >> $GITHUB_ENV
+
+      - name: Log into GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get the last image date (from branch-latest tag)
+        id: image_date
+        run: |
+          # Get the creation date of the branch-latest image
+          IMAGE_DATE=$(docker manifest inspect ghcr.io/${{ github.repository }}:${{ github.ref_name }}-latest --format '{{ .Created }}' || echo "not found")
+          if [[ "$IMAGE_DATE" == "not found" ]]; then
+            echo "IMAGE_DATE=0" >> $GITHUB_ENV
+          else
+            # Convert the image date to a Unix timestamp
+            IMAGE_TIMESTAMP=$(date -d "$IMAGE_DATE" +%s)
+            echo "IMAGE_DATE=$IMAGE_TIMESTAMP" >> $GITHUB_ENV
+          fi
+
+      - name: Compare commit date with image date
+        id: check_changes
+        run: |
+          if [[ $HEAD_COMMIT_DATE -gt $IMAGE_DATE ]]; then
+            echo "New changes detected. Proceeding with the build."
+          else
+            echo "No new changes since the last build. Skipping the build."
+            exit 0
+          fi
+
+      # Set the date tag
+      - name: Set the date tag
+        run: echo "DATE_TAG=$(date +'%Y%m%d')" >> $GITHUB_ENV
+
+      - name: Get the branch name
+        run: echo "BRANCH_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+
+      # Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Extract Docker metadata (branch and date-based tags)
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}:${{ env.BRANCH_NAME }}-${{ env.DATE_TAG }}
+            ghcr.io/${{ github.repository }}:${{ env.BRANCH_NAME }}-latest
+
+      # Build and push Docker image based on branch
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
