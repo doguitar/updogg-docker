@@ -1,0 +1,7 @@
+# Ignore LICENSE and README files
+LICENSE
+README
+README.md
+
+# Ignore all root-level directories starting with a dot
+.*/
