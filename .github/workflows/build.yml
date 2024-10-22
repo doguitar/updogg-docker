@@ -3,6 +3,14 @@ name: build
 on:
   schedule:
     - cron: '0 14 * * *' # Run at 6:00 AM PST
+    
+  push:
+    branches:
+      - '**'  # Match all branches
+  
+  pull_request:
+    branches:
+      - '**'  # Match all branches
 
 jobs:
   build:
