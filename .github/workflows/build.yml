@@ -58,26 +58,34 @@ jobs:
             exit 0
           fi
 
-      # Set the date tag
       - name: Set the date tag
         run: echo "DATE_TAG=$(date +'%Y%m%d')" >> $GITHUB_ENV
 
-      - name: Get the branch name
-        run: echo "BRANCH_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
-
-      # Set up Docker Buildx
+      - name: Get the sanitized branch or PR name
+        run: |
+          # Extract the reference and replace any invalid characters for Docker tags
+          if [[ "${GITHUB_REF}" == refs/heads/* ]]; then
+            # For branch builds
+            BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          elif [[ "${GITHUB_REF}" == refs/pull/*/merge ]]; then
+            # For pull request builds
+            BRANCH_NAME=pull-request-${GITHUB_REF#refs/pull/}
+            BRANCH_NAME=${BRANCH_NAME//\//-} # Replace slashes with hyphens
+          else
+            BRANCH_NAME=unknown
+          fi
+          echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
+          
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      # Extract Docker metadata (branch and date-based tags)
+        
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
            ${{ github.repository }}
-
-      # Build and push Docker image based on branch
+           
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@v5
