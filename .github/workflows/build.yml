@@ -75,8 +75,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ github.repository }}:${{ env.BRANCH_NAME }}-${{ env.DATE_TAG }}
-            ghcr.io/${{ github.repository }}:${{ env.BRANCH_NAME }}-latest
+            ghcr.io/${{ github.repository }}:${{ env.BRANCH_NAME }}-${{ env.DATE_TAG }} , ghcr.io/${{ github.repository }}:${{ env.BRANCH_NAME }}-latest
 
       # Build and push Docker image based on branch
       - name: Build and push Docker image
